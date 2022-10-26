@@ -1,0 +1,514 @@
+#include <stdio.h>
+
+#include <stdlib.h>
+
+#include <sys/types.h>
+
+#include <unistd.h>
+
+#include <sys/wait.h>
+
+#include <string.h>
+
+#include<dirent.h>
+
+
+
+extern char **environ;
+
+//PreDefining Functions so we can use them before we write code for 
+
+int shell_cd(char **args);
+
+int shell_help(char **args);
+
+int shell_exit(char **args);
+
+int shell_pause(char **args);
+
+int shell_environ(char **args);
+
+
+
+//strings of bulit in functions in my code that i couldn't do through exec This is used to display them When help command is enterd
+
+char *sh_str[] = {
+
+	  "cd",
+
+	  "help",
+
+	  "exit",
+
+	  "pause",
+
+	  "environ"	
+
+};
+
+
+
+/*this is used as a pointer for the built in command functions (They were declared before so we can use them here)
+
+	@HOW THIS EXACTLY WORKS
+
+	When we press enter after entering a command the the args[0] string in the input will be  compared to the sh_str  if it matches 	any of the ones in it it then will use the pointer to it and go the address that is in sh_funcAdd and that command will be executed
+
+*/
+
+int (*sh_funcAdd[]) (char **) = {
+
+	  &shell_cd,
+
+	  &shell_help,
+
+	  &shell_exit,
+
+	  &shell_pause,
+
+	  &shell_environ
+
+};
+
+
+
+//this function is used to output the number of built in commands to be used in the compare operation
+
+int num_shellCommands() {
+
+	  return sizeof(sh_str) / sizeof(char *);
+
+}
+
+
+
+
+
+
+
+//Fnction to do CD
+
+int shell_cd(char **args)
+
+{
+
+	if (args[1] == NULL) {
+
+	//IF there is no arguments to cd Print an error and return to main (stderr is a standerd error output)
+
+	printf("ShellError: expected argument to \"cd\"\n");
+
+	} 
+
+
+
+	else {
+
+	//chdir changes the current working directory of the calling process to the directory specified in path
+
+	if (chdir(args[1]) != 0) {
+
+	printf("ShellError: an error Occured please make sure that the directory is valid\n");
+
+	}
+
+	}
+
+	//END OF FUNCTION fn_cd
+
+	return 1;
+
+}
+
+
+
+
+
+
+
+
+
+//help function
+
+int shell_help(char **args)
+
+{
+
+	int i;
+
+	//Messages to show :)
+
+	//printf("\n***********************************************");	
+
+	printf("\nThis is Mohammed_Hassan Shell.......HELLO:)\n");
+
+	printf("Type program names and arguments, and hit enter.\n");
+
+	printf("The following are built in commands:\n");
+
+
+
+	//Loop to print the contents of 
+
+	for (i = 0; i < num_shellCommands(); i++) {
+
+	printf("  %s\n", sh_str[i]);
+
+	}
+
+
+
+	printf("Use the man command for information on other programs.\n");
+
+
+
+	//END OF HELP
+
+	return 1;
+
+}
+
+
+
+
+
+
+
+
+
+//This is used to Exit the Shell
+
+int shell_exit(char **args)
+
+{
+
+  exit(0);
+
+}
+
+
+
+//This is used to Pause the Shell untill Enter is pressed
+
+int shell_pause(char **args){
+
+	int c;
+
+	printf("PRESS [ENTER] TO CONTINUE");
+
+	//basically puts the program in a loop untill Enter is pressed
+
+	while ((c = getchar()) != '\n' && c != EOF) { }		
+
+
+
+
+
+return 0;
+
+}
+
+
+
+//To display the envoroment variables of the system
+
+int shell_environ(char **args)
+
+{
+
+int i = 1;
+
+  char *s = *environ;
+
+
+
+  for (; s; i++) {
+
+    printf("%s\n", s);
+
+    s = *(environ+i);
+
+  }
+
+
+
+  return 0;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//This is the EXEC Command that is used to change the child proccess that is forked code to the target process
+
+int shell_exec(char **args)
+
+{
+
+	pid_t pid, wpid;
+
+	int status;
+
+	//Forking
+
+	pid = fork();
+
+
+
+	// Child process Code
+
+	if (pid == 0) {
+
+	
+
+		if (execvp(args[0], args) == -1) {
+
+			printf("ShellError: Command not found\n");		
+
+	}
+
+
+
+		exit(-1);
+
+	}
+
+ 
+
+	// Error forking
+
+	else if (pid < 0) {
+
+		printf("ShellError: Error in Forking\n");	
+
+	} 	
+
+	
+
+	// Parent process Code
+
+	else {
+
+	//THIS TELLS THE PARENT PROCESS TO WAIT FOR CHILD PROCESS TO FINISH ITS JOB
+
+		do {
+
+		wpid = waitpid(pid, &status, WUNTRACED);
+
+		} 
+
+		while (!WIFEXITED(status) && !WIFSIGNALED(status));
+
+	}
+
+
+
+
+
+//END OF EXEC 
+
+return 1;
+
+}
+
+
+
+
+
+
+
+//This function is used to first Make sure that a command has been enterd and then to check if the enterd command is one of the built in functions
+
+int shell_execute(char **args){
+
+
+
+	int i;
+
+	
+
+	if (args[0] == NULL) {
+
+		 //An empty command was entered Return to MAIN
+
+		return 1;
+
+	}
+
+
+
+	for (i = 0; i < num_shellCommands(); i++) {
+
+	//COMPARES the interd Argument with the built in Function if it matches it returns to one of them else it returns to Shell_exec
+
+		if (strcmp(args[0], sh_str[i]) == 0) {
+
+			return (*sh_funcAdd[i])(args);
+
+		}
+
+	}
+
+//Returns to shell_exec in case non of the commands are built in
+
+return shell_exec(args);
+
+}
+
+
+
+
+
+
+
+
+
+//This function is used to get the Current PATH
+
+int getCurrentPath(){
+
+char pwd[PATH_MAX];
+
+	
+
+	//getcwd copies the present working directory to the buffer cwd
+
+	
+
+	if(getcwd(pwd,PATH_MAX)!=NULL)
+
+		printf("Mohammed -SHELL:%s$ ",pwd);
+
+	else
+
+		printf("ShellError: error in retrieving present working directoy\n");
+
+	return 0;
+
+
+
+
+}
+
+
+
+
+
+int main (int argc, char *argv[]){
+
+	//clears the terminal
+
+	printf("\e[1;1H\e[2J");	
+
+	printf("******************************************"); 
+
+    	printf("\n\n\n\t****MY SHELL****"); 
+
+    	printf("\n\n\t-HOPE IT WORKS :)"); 
+
+    	printf("\n\n\n\n******************************************\n"); 
+
+
+
+
+
+	//INF loop to keep the shell going untill it explcitly terminated or an error occured
+
+	while (1) {
+
+	//calling the function to get the current path and print it
+
+	getCurrentPath();
+
+	
+
+	// I've assumed that the max command we will recive is 99 characters.
+
+	char* command[100];
+
+		
+
+	// Scanning a string util we face a \n (enter) 
+
+	scanf ("%[^\n]99s", *command);
+
+		
+
+	// Consume the last \n so our next scan will wait ;)
+
+	getchar ();
+
+		
+
+	// I've assumed that the max number of args is 10 + 1 (Last one should be NULL).
+
+	char* args[11];
+
+		
+
+	//strtok is used to Seperate a string
+
+	char* command_token = strtok (*command, " ");
+
+	//the count of arguments	
+
+	int argscounter = 0;
+
+
+
+	while (command_token != NULL && argscounter < 10) {
+
+	// I just pointed our array element to the start of the small string.
+
+	args[argscounter] = command_token;
+
+	//Updated the Args Counter
+
+	argscounter ++;
+
+	//set null
+
+	command_token= strtok(NULL, " ");
+
+	//END OF THE SPLITING THE INPUTS INTO ARGUMENTS LOOP
+
+	}
+
+
+
+	//Setting the Last argument in args to NULL
+
+	args[argscounter] = NULL;
+
+	
+
+	//This goes to the function shell_execute which is used to Execute Commands and take args as input    
+
+	shell_execute(args);
+
+	}
+
+
+
+
+
+
+
+//End OF MAIN
+
+	return 0;
+
+}
